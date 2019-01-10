@@ -149,6 +149,8 @@ sub GetSuppliersWithLateIssues {
             limit => 100,         #OPTIONAL
     });
 
+Does a FULL OUTER JOIN on koha.serial and koha.items
+
 =cut
 
 sub GetSerialItems {
@@ -157,6 +159,7 @@ sub GetSerialItems {
 
     my @params = ($params->{biblionumber});
     my $serialitems_sql = "
+(
 SELECT i.*,
   (SELECT lib FROM authorised_values WHERE category = 'LOC' AND authorised_value = i.location) as c_location,
   (SELECT lib FROM authorised_values WHERE category = 'LOC' AND authorised_value = i.permanent_location) as c_permanent_location,
@@ -191,22 +194,33 @@ FROM serial s
     LEFT JOIN (SELECT resb.cardnumber, resb.borrowernumber, r.itemnumber, r.waitingdate FROM reserves r LEFT JOIN borrowers resb ON resb.borrowernumber = r.borrowernumber ORDER BY priority ASC) as resbor ON resbor.itemnumber = i.itemnumber
     LEFT JOIN localization ON itps.itemtype = localization.code
 WHERE s.biblionumber = ?
-AND i.itemnumber IS NOT NULL
 ";
     if ($params->{serialseq_x}) {
         $serialitems_sql .= "AND s.serialseq_x = ? ";
+        push @params, $params->{serialseq_x};
+    }
+    elsif (defined($params->{serialseq_x})) {
+        $serialitems_sql .= "AND (s.serialseq_x = ? OR s.serialseq_x IS NULL)";
         push @params, $params->{serialseq_x};
     }
     if ($params->{serialseq_y}) {
         $serialitems_sql .= "AND s.serialseq_y = ? ";
         push @params, $params->{serialseq_y};
     }
+    elsif (defined($params->{serialseq_y})) {
+        $serialitems_sql .= "AND (s.serialseq_y = ? OR s.serialseq_y IS NULL)";
+        push @params, $params->{serialseq_y};
+    }
     if ($params->{serialseq_z}) {
         $serialitems_sql .= "AND s.serialseq_z = ? ";
         push @params, $params->{serialseq_z};
     }
+    elsif (defined($params->{serialseq_z})) {
+        $serialitems_sql .= "AND (s.serialseq_z = ? OR s.serialseq_z IS NULL)";
+        push @params, $params->{serialseq_z};
+    }
     if ($params->{serialStatus}) {
-        $serialitems_sql .= "AND s.status = ? ";
+        $serialitems_sql .= "AND (s.status = ? OR s.status IS NULL) ";
         push @params, $params->{serialStatus};
     }
     if ($params->{holdingbranch}) {
@@ -219,6 +233,95 @@ AND i.itemnumber IS NOT NULL
         $serialitems_sql .= "LIMIT ? ";
         push @params, $params->{limit};
     }
+    $serialitems_sql .= '
+)
+';
+
+
+    $serialitems_sql .= "
+UNION
+    ";
+
+
+    push @params, $params->{biblionumber};
+    $serialitems_sql .= "
+(
+SELECT i.*,
+  (SELECT lib FROM authorised_values WHERE category = 'LOC' AND authorised_value = i.location) as c_location,
+  (SELECT lib FROM authorised_values WHERE category = 'LOC' AND authorised_value = i.permanent_location) as c_permanent_location,
+  (SELECT lib FROM authorised_values WHERE category = 'NOT_LOAN' AND authorised_value = i.notforloan) as c_notforloan,
+  (SELECT lib FROM authorised_values WHERE category = 'DAMAGED' AND authorised_value = i.damaged) as c_damaged,
+  (SELECT lib FROM authorised_values WHERE category = 'LOST' AND authorised_value = i.itemlost) as c_itemlost,
+  (SELECT lib FROM authorised_values WHERE category = 'WITHDRAWN' AND authorised_value = i.withdrawn) as c_withdrawn,
+  (SELECT description FROM itemtypes WHERE itemtype = i.itype) as c_itype,
+  (SELECT lib FROM authorised_values WHERE category = 'CCODE' AND authorised_value = i.ccode) as c_ccode,
+  (SELECT branchname FROM branches WHERE branchcode = holdingbranch) as c_holdingbranch,
+  (SELECT branchname FROM branches WHERE branchcode = homebranch) as c_homebranch,
+  s.*,
+  iss.date_due as iss_date_due,
+  issb.borrowernumber as iss_borrowernumber,
+  issb.cardnumber as iss_cardnumber,
+  resbor.cardnumber as res_cardnumber,
+  resbor.borrowernumber as res_borrowernumber,
+  resbor.waitingdate as res_waitingdate,
+  bt.transfertfrom,
+  bt.transfertto,
+  bt.transfertwhen,
+  itps.imageurl,
+  COALESCE( localization.translation, itps.description ) AS translated_description
+FROM items i
+    LEFT JOIN serialitems si ON i.itemnumber = si.itemnumber
+    LEFT JOIN serial s ON s.serialid = si.serialid
+    LEFT JOIN subscription sub ON sub.subscriptionid = s.subscriptionid
+    LEFT JOIN issues iss ON i.itemnumber = iss.itemnumber
+    LEFT JOIN borrowers issb ON issb.borrowernumber = iss.borrowernumber
+    LEFT JOIN (SELECT bt.itemnumber, bt.frombranch as transfertfrom, bt.tobranch as transfertto, bt.datesent as transfertwhen FROM branchtransfers bt WHERE bt.datearrived IS NULL) as bt ON bt.itemnumber = i.itemnumber
+    LEFT JOIN itemtypes itps ON itps.itemtype = i.itype
+    LEFT JOIN (SELECT resb.cardnumber, resb.borrowernumber, r.itemnumber, r.waitingdate FROM reserves r LEFT JOIN borrowers resb ON resb.borrowernumber = r.borrowernumber ORDER BY priority ASC) as resbor ON resbor.itemnumber = i.itemnumber
+    LEFT JOIN localization ON itps.itemtype = localization.code
+WHERE i.biblionumber = ?
+";
+    if ($params->{serialseq_x}) {
+        $serialitems_sql .= "AND s.serialseq_x = ? ";
+        push @params, $params->{serialseq_x};
+    }
+    elsif (defined($params->{serialseq_x})) {
+        $serialitems_sql .= "AND (s.serialseq_x = ? OR s.serialseq_x IS NULL)";
+        push @params, $params->{serialseq_x};
+    }
+    if ($params->{serialseq_y}) {
+        $serialitems_sql .= "AND s.serialseq_y = ? ";
+        push @params, $params->{serialseq_y};
+    }
+    elsif (defined($params->{serialseq_y})) {
+        $serialitems_sql .= "AND (s.serialseq_y = ? OR s.serialseq_y IS NULL)";
+        push @params, $params->{serialseq_y};
+    }
+    if ($params->{serialseq_z}) {
+        $serialitems_sql .= "AND s.serialseq_z = ? ";
+        push @params, $params->{serialseq_z};
+    }
+    elsif (defined($params->{serialseq_z})) {
+        $serialitems_sql .= "AND (s.serialseq_z = ? OR s.serialseq_z IS NULL)";
+        push @params, $params->{serialseq_z};
+    }
+    if ($params->{serialStatus}) {
+        $serialitems_sql .= "AND (s.status = ? OR s.status IS NULL) ";
+        push @params, $params->{serialStatus};
+    }
+    if ($params->{holdingbranch}) {
+        $serialitems_sql .= "AND i.holdingbranch = ? ";
+        push @params, $params->{holdingbranch};
+    }
+    $serialitems_sql .= " GROUP BY i.itemnumber ";
+    $serialitems_sql .= " ORDER BY CAST(s.serialseq_x AS UNSIGNED INTEGER) DESC, CAST(s.serialseq_y AS UNSIGNED INTEGER) DESC, CAST(s.serialseq_z AS UNSIGNED INTEGER) DESC ";
+    if ($params->{limit}) {
+        $serialitems_sql .= "LIMIT ? ";
+        push @params, $params->{limit};
+    }
+    $serialitems_sql .= '
+)
+';
 
     my $serialitems_sth = $dbh->prepare($serialitems_sql);
     $serialitems_sth->execute( @params );
