@@ -1,0 +1,71 @@
+{
+  "type": "object",
+  "properties": {
+    "serialid": {
+      "type": ["integer", "null"],
+      "description": "DB id of this serial"
+    },
+    "biblionumber": {
+      "$ref": "../x-primitives.json#/biblionumber"
+    },
+    "subscriptionid": {
+      "type": ["integer"],
+      "description": "subscription this serial is part of"
+    },
+    "itemnumber": {
+      "type": ["integer", "null"],
+      "description": "itemnumber this serial is attached to, if applicable"
+    },
+    "serialseq": {
+      "type": "string",
+      "description": "enumeration or chronology of this serial"
+    },
+    "serialseq_x": {
+      "type": "string",
+      "description": "1st component of this serial's enumeration"
+    },
+    "serialseq_y": {
+      "type": "string",
+      "description": "2nd component of this serial's enumeration"
+    },
+    "serialseq_z": {
+      "type": "string",
+      "description": "3rd component of this serial's enumeration"
+    },
+    "status": {
+      "type": "integer",
+      "description": "Internal status code. 2 = received, 1 = expected. See C4::Serials -> use constant."
+    },
+    "planneddate": {
+      "type": "string",
+      "description": "When this serial should arrive to the library",
+      "format": "date"
+    },
+    "notes": {
+      "type": ["string", "null"],
+      "description": ""
+    },
+    "publisheddate": {
+      "type": "string",
+      "description": "When this serial is published and starts moving to the library",
+      "format": "date"
+    },
+    "publisheddatetext": {
+      "type": ["string", "null"],
+      "description": ""
+    },
+    "claimdate": {
+      "type": ["string", "null"],
+      "description": "",
+      "format": "date"
+    },
+    "claims_count": {
+      "type": ["integer", "null"],
+      "description": ""
+    },
+    "routingnotes": {
+      "type": ["string", "null"],
+      "description": ""
+    }
+  }
+}

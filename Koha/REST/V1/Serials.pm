@@ -22,6 +22,10 @@ use Mojo::Base 'Mojolicious::Controller';
 use C4::Serials;
 
 use Try::Tiny;
+use Data::Printer;
+
+use Koha::Exception::UnknownObject;
+use Koha::Exception::BadParameter;
 
 sub get_serial_items {
     my $c = shift->openapi->valid_input or return;
@@ -57,4 +61,198 @@ sub get_collection {
     }
 }
 
+sub serial_delete {
+    my $logger = Koha::Logger->get();
+    my $c = shift->openapi->valid_input or return;
+
+    try {
+        my $serialid = $c->validation->param('serialid');
+
+        my $serial = C4::Serials::GetSerial($serialid);
+        Koha::Exception::UnknownObject->throw(error => "No such serial") unless $serial;
+
+        my $deletedCount = C4::Serials::DeleteSerial($serialid);
+        Koha::Exception::DB->throw(error => "The given serial '$serialid' exists, but deleting it causes '$deletedCount' rows to be removed from the DB? Expected to only remove 1 row.") if ($deletedCount != 1);
+
+        return $c->render(status => 200, openapi => _swaggerizeSerial($serial));
+    }
+    catch {
+        unless (blessed $_ && $_->can('rethrow')) {
+            return $c->render(status  => 500,
+                              openapi => { error => "$_" });
+        }
+        if ($_->isa('Koha::Exception::DB')) {
+            return $c->render(status  => 500,
+                              openapi => { error => "$_" });
+        }
+        elsif ($_->isa('Koha::Exception::UnknownObject')) {
+            return $c->render(status  => 404,
+                              openapi => { error => "$_" });
+        }
+        elsif ($_->isa('Koha::Exception::BadParameter')) {
+            return $c->render(status  => 400,
+                              openapi => { error => "$_" });
+        }
+        else {
+            return $c->render(status  => 500,
+                              openapi => { error => "$_" });
+        }
+    };
+}
+
+sub serial_get {
+    my $logger = Koha::Logger->get();
+    my $c = shift->openapi->valid_input or return;
+
+    try {
+        my $serialid = $c->validation->param('serialid');
+
+        my $serial = C4::Serials::GetSerial($serialid);
+        Koha::Exception::UnknownObject->throw(error => "No serial found with serialid='".($serialid || 'undef')."'") unless $serial;
+
+        return $c->render(status => 200, openapi => _swaggerizeSerial($serial));
+    }
+    catch {
+        unless (blessed $_ && $_->can('rethrow')) {
+            return $c->render(status  => 500,
+                              openapi => { error => "$_" });
+        }
+        if ($_->isa('Koha::Exception::DB')) {
+            return $c->render(status  => 500,
+                              openapi => { error => "$_" });
+        }
+        elsif ($_->isa('Koha::Exception::UnknownObject')) {
+            return $c->render(status  => 404,
+                              openapi => { error => "$_" });
+        }
+        elsif ($_->isa('Koha::Exception::BadParameter')) {
+            return $c->render(status  => 400,
+                              openapi => { error => "$_" });
+        }
+        else {
+            return $c->render(status  => 500,
+                              openapi => { error => "$_" });
+        }
+    };
+}
+
+sub serial_list {
+    my $logger = Koha::Logger->get();
+    my $c = shift->openapi->valid_input or return;
+
+    try {
+        my $biblionumber = $c->validation->param('biblionumber');
+        my $subscriptionid = $c->validation->param('subscriptionid');
+        Koha::Exception::BadParameter->throw(error => "Either the biblionumber or the subscriptionid -parameters must be given.") unless ($subscriptionid or $biblionumber);
+
+        my $serials = C4::Serials::ListSerials($subscriptionid, $biblionumber);
+        Koha::Exception::UnknownObject->throw(error => "No serials found for biblionumber='".($biblionumber || 'undef')."', subscriptionid='".($subscriptionid || 'undef')."'") unless @$serials;
+        @$serials = map {_swaggerizeSerial($_)} @$serials;
+
+        return $c->render(status => 200, openapi => $serials);
+    }
+    catch {
+        unless (blessed $_ && $_->can('rethrow')) {
+            return $c->render(status  => 500,
+                              openapi => { error => "$_" });
+        }
+        if ($_->isa('Koha::Exception::DB')) {
+            return $c->render(status  => 500,
+                              openapi => { error => "$_" });
+        }
+        elsif ($_->isa('Koha::Exception::UnknownObject')) {
+            return $c->render(status  => 404,
+                              openapi => { error => "$_" });
+        }
+        elsif ($_->isa('Koha::Exception::BadParameter')) {
+            return $c->render(status  => 400,
+                              openapi => { error => "$_" });
+        }
+        else {
+            return $c->render(status  => 500,
+                              openapi => { error => "$_" });
+        }
+    };
+}
+
+sub serial_post {
+    my $logger = Koha::Logger->get();
+    my $c = shift->openapi->valid_input or return;
+
+    try {
+        my $serial = $c->validation->param('serial');
+
+        $serial = C4::Serials::AddSerial($serial);
+
+        return $c->render(status => 200, openapi => _swaggerizeSerial($serial));
+    }
+    catch {
+        unless (blessed $_ && $_->can('rethrow')) {
+            return $c->render(status  => 500,
+                              openapi => { error => "$_" });
+        }
+        if ($_->isa('Koha::Exception::DB')) {
+            return $c->render(status  => 500,
+                              openapi => { error => "$_" });
+        }
+        elsif ($_->isa('Koha::Exception::UnknownObject')) {
+            return $c->render(status  => 404,
+                              openapi => { error => "$_" });
+        }
+        elsif ($_->isa('Koha::Exception::BadParameter')) {
+            return $c->render(status  => 400,
+                              openapi => { error => "$_" });
+        }
+        else {
+            return $c->render(status  => 500,
+                              openapi => { error => "$_" });
+        }
+    };
+}
+
+sub serial_put {
+    my $logger = Koha::Logger->get();
+    my $c = shift->openapi->valid_input or return;
+
+    try {
+        my $serialid = $c->validation->param('serialid');
+        my $serial = $c->validation->param('serial');
+        $serial->{serialid} = $serialid;
+
+        $serial = C4::Serials::ModSerial($serial);
+
+        return $c->render(status => 200, openapi => _swaggerizeSerial($serial));
+    }
+    catch {
+        unless (blessed $_ && $_->can('rethrow')) {
+            return $c->render(status  => 500,
+                              openapi => { error => "$_" });
+        }
+        if ($_->isa('Koha::Exception::DB')) {
+            return $c->render(status  => 500,
+                              openapi => { error => "$_" });
+        }
+        elsif ($_->isa('Koha::Exception::UnknownObject')) {
+            return $c->render(status  => 404,
+                              openapi => { error => "$_" });
+        }
+        elsif ($_->isa('Koha::Exception::BadParameter')) {
+            return $c->render(status  => 400,
+                              openapi => { error => "$_" });
+        }
+        else {
+            return $c->render(status  => 500,
+                              openapi => { error => "$_" });
+        }
+    };
+}
+
+sub _swaggerizeSerial {
+    $_[0]->{itemnumber}     += 0 if (defined($_[0]->{itemnumber}));
+    $_[0]->{biblionumber}   += 0 if (defined($_[0]->{biblionumber}));
+    $_[0]->{subscriptionid} += 0 if (defined($_[0]->{subscriptionid}));
+    $_[0]->{status}         += 0 if (defined($_[0]->{status}));
+    $_[0]->{claims_count}   += 0 if (defined($_[0]->{claims_count}));
+    return $_[0];
+}
 1;

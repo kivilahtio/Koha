@@ -20,6 +20,8 @@ package C4::Serials;
 
 use Modern::Perl;
 
+use Data::Printer;
+
 use C4::Auth qw(haspermission);
 use C4::Context;
 use DateTime;
@@ -110,6 +112,157 @@ Functions for handling subscriptions, claims routing etc.
 
 
 =head1 SUBROUTINES
+
+=cut
+
+use Koha::Exception::DB;
+use Koha::Exception::UnknownObject;
+
+=head2 AddSerial
+
+Koha::Serial could be used here, but the complex DBIC-Koha-Object would first have to be serialized from DBI result so it can straight away be deserialized for swagger.
+This makes no sense.
+
+ @param {HASHRef} koha.serial columns and values
+                  If itemnumber-column is passed, the serial-object is automatically linked to the given item via koha.serialitems
+ @returns {HASHRef} the same serial-object with the serialid primary key set
+ @throws Koha::Exception::DB
+ @throws Koha::Exception::BadParameter
+
+=cut
+
+sub AddSerial {
+    my ($serial) = @_;
+    Koha::Exception::BadParameter->throw(error => "Missing mandatory parameter 'serial'") unless $serial;
+    $logger->debug("Adding serial: ".np($serial)) if $logger->is_debug();
+
+    my $dbh = C4::Context->dbh();
+    my $sth = $dbh->prepare("
+    INSERT INTO serial (
+        serialid, biblionumber, subscriptionid, serialseq,
+        serialseq_x, serialseq_y, serialseq_z, status, planneddate,
+        notes, publisheddate, publisheddatetext, claimdate, claims_count, routingnotes
+    )
+    VALUES (
+        ?,        ?,            ?,              ?,
+        ?,           ?,           ?,           ?,      ?,
+        ?,     ?,             ?,                 ?,         ?,            ?
+    )
+    ");
+    $sth->execute(
+        $serial->{serialid}, $serial->{biblionumber}, $serial->{subscriptionid}, $serial->{serialseq},
+        $serial->{serialseq_x}, $serial->{serialseq_y}, $serial->{serialseq_z}, $serial->{status}, $serial->{planneddate},
+        $serial->{notes}, $serial->{publisheddate}, $serial->{publisheddatetext}, $serial->{claimdate}, $serial->{claims_count}, $serial->{routingnotes}
+    ) || Koha::Exception::DB->throw(error => "Trying to add a new serial failed: ".$dbh->errstr);
+    $serial->{serialid} = $sth->{mysql_insertid} // $sth->last_insert_id() // Koha::Exception::DB->throw(error => "Couldn't get the last_insert_id from a newly created serial $serial");
+
+    if ($serial->{itemnumber}) {
+        $sth = $dbh->prepare("INSERT INTO serialitems (itemnumber, serialid) VALUES (?, ?)") || Koha::Exception::DB->throw(error => "Preparing statement for serial '".$serial->{serialid}."' failed: ".$dbh->errstr);
+        $sth->execute($serial->{itemnumber}, $serial->{serialid}) || Koha::Exception::DB->throw(error => "Adding item-link for serial '".$serial->{serialid}."' failed: ".$dbh->errstr);
+    }
+    return $serial;
+}
+
+=head2 DeleteSerial
+
+C4::Serials::DelIssue requires subscriptionid and serialid for some reason. Not draconian enough to needlessly demand subscriptionid from our API consumers.
+
+ @param {Integer} serialid
+ @returns {Integer} count of rows deleted, should be 1 or 0E0
+ @throws Koha::Exception::DB
+
+=cut
+
+sub DeleteSerial {
+    my ($serialid) = @_;
+    $logger->debug("Deleting serial '$serialid'") if $logger->is_debug();
+    my $dbh = C4::Context->dbh();
+    my $sth = $dbh->prepare("DELETE FROM serial WHERE serialid = ?") || Koha::Exception::DB->throw(error => $dbh->errstr);
+    my $deletedCount = $sth->execute($serialid);
+    Koha::Exception::DB->throw(error => $dbh->errstr) if $dbh->errstr();
+    return $deletedCount;
+}
+
+=head2 GetSerial
+
+ @param {Integer} serialid
+ @returns {HASHRef} koha.serial-row
+ @throws Koha::Exception::DB
+
+=cut
+
+sub GetSerial {
+    my ($serialid) = @_;
+    $logger->debug("Getting serial '$serialid'") if $logger->is_debug();
+    my $dbh = C4::Context->dbh();
+    my $serial = $dbh->selectrow_hashref("SELECT serial.*, serialitems.itemnumber FROM serial LEFT JOIN serialitems ON serial.serialid = serialitems.serialid WHERE serial.serialid = ?", {}, $serialid);
+    Koha::Exception::DB->throw(error => $dbh->errstr) if $dbh->errstr();
+    return $serial;
+}
+
+=head2 ListSerials
+
+ @param {Integer} subscriptionid or undef
+ @param {Integer} biblionumber or undef
+ @returns {ARRAYRef of HASHRef} koha.serial-rows
+ @throws Koha::Exception::DB
+
+=cut
+
+sub ListSerials {
+    my ($subscriptionid, $biblionumber) = @_;
+    $logger->debug("Listing serials with biblionumber='".($biblionumber || 'undef')."', subscriptionid='".($subscriptionid || 'undef')."'") if $logger->is_debug();
+    my @params;
+
+    my $dbh = C4::Context->dbh();
+    my $sql = "SELECT serial.*, serialitems.itemnumber FROM serial LEFT JOIN serialitems ON serial.serialid = serialitems.serialid WHERE 1";
+    if ($biblionumber) {
+        $sql .= "    AND biblionumber = ?";
+        push(@params, $biblionumber);
+    }
+    if ($subscriptionid) {
+        $sql .= "    AND subscriptionid = ?";
+        push(@params, $subscriptionid);
+    }
+
+    my $serials = $dbh->selectall_arrayref($sql, { Slice => {} }, @params);
+    Koha::Exception::DB->throw(error => $dbh->errstr) if $dbh->errstr();
+    return $serials || [];
+}
+
+=head2 ModSerial
+
+ @param {HASHRef} koha.serial columns and values
+ @returns {HASHRef} the same serial-object with the serialid primary key set
+ @throws Koha::Exception::DB
+ @throws Koha::Exception::BadParameter
+
+=cut
+
+sub ModSerial {
+    my ($serial) = @_;
+    Koha::Exception::BadParameter->throw(error => "Missing mandatory parameter 'serial'") unless $serial;
+    $logger->debug("Updating serial: ".np($serial)) if $logger->is_debug();
+
+    my $dbh = C4::Context->dbh();
+    my $sth = $dbh->prepare("
+    UPDATE serial
+    SET
+           biblionumber=?, subscriptionid=?, serialseq=?,
+           serialseq_x=?, serialseq_y=?, serialseq_z=?, status=?, planneddate=?,
+           notes=?, publisheddate=?, publisheddatetext=?, claimdate=?, claims_count=?, routingnotes=?
+    WHERE  serialid = ?
+    ;
+    ");
+    my $rowsAffected = $sth->execute(
+        $serial->{biblionumber}, $serial->{subscriptionid}, $serial->{serialseq},
+        $serial->{serialseq_x}, $serial->{serialseq_y}, $serial->{serialseq_z}, $serial->{status}, $serial->{planneddate},
+        $serial->{notes}, $serial->{publisheddate}, $serial->{publisheddatetext}, $serial->{claimdate}, $serial->{claims_count}, $serial->{routingnotes},
+        $serial->{serialid}
+    ) || Koha::Exception::DB->throw(error => $dbh->errstr);
+    Koha::Exception::UnknownObject->throw(error => "Trying to update serial '".($serial->{serialid} || 'undef')."' but no such serial exists.") unless $rowsAffected > 0;
+    return $serial;
+}
 
 =head2 GetSuppliersWithLateIssues
 
@@ -603,22 +756,22 @@ sub GetFullSubscription {
     my $query            = qq|
   SELECT    serial.serialid,
             serial.serialseq,
-            serial.planneddate, 
-            serial.publisheddate, 
+            serial.planneddate,
+            serial.publisheddate,
             serial.publisheddatetext,
-            serial.status, 
+            serial.status,
             serial.notes as notes,
             year(IF(serial.publisheddate="00-00-0000",serial.planneddate,serial.publisheddate)) as year,
             aqbooksellers.name as aqbooksellername,
             biblio.title as bibliotitle,
             subscription.branchcode AS branchcode,
             subscription.subscriptionid AS subscriptionid
-  FROM      serial 
-  LEFT JOIN subscription ON 
+  FROM      serial
+  LEFT JOIN subscription ON
           (serial.subscriptionid=subscription.subscriptionid )
-  LEFT JOIN aqbooksellers on subscription.aqbooksellerid=aqbooksellers.id 
-  LEFT JOIN biblio on biblio.biblionumber=subscription.biblionumber 
-  WHERE     serial.subscriptionid = ? 
+  LEFT JOIN aqbooksellers on subscription.aqbooksellerid=aqbooksellers.id
+  LEFT JOIN biblio on biblio.biblionumber=subscription.biblionumber
+  WHERE     serial.subscriptionid = ?
   ORDER BY year DESC,
           IF(serial.publisheddate="00-00-0000",serial.planneddate,serial.publisheddate) DESC,
           serial.subscriptionid
@@ -765,21 +918,21 @@ sub GetFullSubscriptionsFromBiblionumber {
     my $query          = qq|
   SELECT    serial.serialid,
             serial.serialseq,
-            serial.planneddate, 
-            serial.publisheddate, 
+            serial.planneddate,
+            serial.publisheddate,
             serial.publisheddatetext,
-            serial.status, 
+            serial.status,
             serial.notes as notes,
             year(IF(serial.publisheddate="00-00-0000",serial.planneddate,serial.publisheddate)) as year,
             biblio.title as bibliotitle,
             subscription.branchcode AS branchcode,
             subscription.subscriptionid AS subscriptionid
-  FROM      serial 
-  LEFT JOIN subscription ON 
+  FROM      serial
+  LEFT JOIN subscription ON
           (serial.subscriptionid=subscription.subscriptionid)
-  LEFT JOIN aqbooksellers on subscription.aqbooksellerid=aqbooksellers.id 
-  LEFT JOIN biblio on biblio.biblionumber=subscription.biblionumber 
-  WHERE     subscription.biblionumber = ? 
+  LEFT JOIN aqbooksellers on subscription.aqbooksellerid=aqbooksellers.id
+  LEFT JOIN biblio on biblio.biblionumber=subscription.biblionumber
+  WHERE     subscription.biblionumber = ?
   ORDER BY year DESC,
           IF(serial.publisheddate="00-00-0000",serial.planneddate,serial.publisheddate) DESC,
           serial.subscriptionid
@@ -1033,7 +1186,7 @@ sub GetSerials2 {
     my $query = q|
                  SELECT serialid,serialseq, status, planneddate, publisheddate,
                     publisheddatetext, notes, routingnotes
-                 FROM     serial 
+                 FROM     serial
                  WHERE    subscriptionid=?
             |
             . q| AND status IN (| . join( ",", ('?') x @$statuses ) . q|)|
@@ -1382,7 +1535,7 @@ sub ModSubscriptionHistory {
     return unless ($subscriptionid);
 
     my $dbh   = C4::Context->dbh;
-    my $query = "UPDATE subscriptionhistory 
+    my $query = "UPDATE subscriptionhistory
                     SET histstartdate=?,histenddate=?,recievedlist=?,missinglist=?,opacnote=?,librariannote=?
                     WHERE subscriptionid=?
                 ";
@@ -1564,7 +1717,7 @@ sub GetNextExpected {
 ModNextExpected($subscriptionid,$date)
 
 Update the planneddate for the current expected issue of the subscription.
-This will modify all future prediction results.  
+This will modify all future prediction results.
 
 C<$date> is an ISO date.
 
@@ -1797,7 +1950,7 @@ sub ReNewSubscription {
     my $subscription = GetSubscription($subscriptionid);
     my $query        = qq|
          SELECT *
-         FROM   biblio 
+         FROM   biblio
          LEFT JOIN biblioitems ON biblio.biblionumber=biblioitems.biblionumber
          WHERE    biblio.biblionumber=?
      |;
@@ -1927,7 +2080,7 @@ sub NewIssue {
 
 1 or 0 = HasSubscriptionStrictlyExpired($subscriptionid)
 
-the subscription has stricly expired when today > the end subscription date 
+the subscription has stricly expired when today > the end subscription date
 
 return :
 1 if true, 0 if false, -1 if the expiration date is not set.
@@ -2162,7 +2315,7 @@ sub DelIssue {
 this function selects missing issues on database - where serial.status = MISSING* or serial.status = LATE or planneddate<now
 
 return :
-the issuelist as an array of hash refs. Each element of this array contains 
+the issuelist as an array of hash refs. Each element of this array contains
 name,title,planneddate,serialseq,serial.subscriptionid from tables : subscription, serial & biblio
 
 =cut
@@ -2287,7 +2440,7 @@ sub check_routing {
 
     my $dbh              = C4::Context->dbh;
     my $sth              = $dbh->prepare(
-        "SELECT count(routingid) routingids FROM subscription LEFT JOIN subscriptionroutinglist 
+        "SELECT count(routingid) routingids FROM subscription LEFT JOIN subscriptionroutinglist
                               ON subscription.subscriptionid = subscriptionroutinglist.subscriptionid
                               WHERE subscription.subscriptionid = ? ORDER BY ranking ASC
                               "
@@ -2417,7 +2570,7 @@ sub getroutinglist {
     my $dbh              = C4::Context->dbh;
     my $sth              = $dbh->prepare(
         'SELECT routingid, borrowernumber, ranking, biblionumber
-            FROM subscription 
+            FROM subscription
             JOIN subscriptionroutinglist ON subscription.subscriptionid = subscriptionroutinglist.subscriptionid
             WHERE subscription.subscriptionid = ? ORDER BY ranking ASC'
     );
@@ -2485,14 +2638,14 @@ sub HasItems {
     my $dbh              = C4::Context->dbh;
     my $query = q|
             SELECT COUNT(serialitems.itemnumber)
-            FROM   serial 
+            FROM   serial
 			LEFT JOIN serialitems USING(serialid)
             WHERE  subscriptionid=? AND serialitems.serialid IS NOT NULL
         |;
     my $sth=$dbh->prepare($query);
     $sth->execute($subscriptionid);
     my ($countitems)=$sth->fetchrow_array();
-    return $countitems;  
+    return $countitems;
 }
 
 =head2 abouttoexpire

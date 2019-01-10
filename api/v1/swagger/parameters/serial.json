@@ -1,0 +1,9 @@
+{
+  "serialidPathParam": {
+    "name": "serialid",
+    "in": "path",
+    "description": "Internal serial identifier",
+    "required": true,
+    "type": "integer"
+  }
+}

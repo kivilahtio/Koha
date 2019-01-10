@@ -200,6 +200,12 @@
   "/serialitems": {
     "$ref": "paths/serials.json#/~1serialitems"
   },
+  "/serials": {
+    "$ref": "paths/serials.json#/~1serials"
+  },
+  "/serials/{serialid}": {
+    "$ref": "paths/serials.json#/~1serials~1{serialid}"
+  },
   "/serials/collection": {
     "$ref": "paths/serials.json#/~1serials~1collection"
   },

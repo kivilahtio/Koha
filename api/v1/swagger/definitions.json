@@ -92,6 +92,9 @@
   "renewability": {
     "$ref": "definitions/renewability.json"
   },
+  "serial": {
+    "$ref": "definitions/serial.json"
+  },
   "suggestion": {
     "$ref": "definitions/suggestion.json"
   },

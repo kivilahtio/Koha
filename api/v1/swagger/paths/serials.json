@@ -94,6 +94,259 @@
       }
     }
   },
+  "/serials": {
+    "get": {
+      "x-mojo-to": "Serials#serial_list",
+      "operationId": "serialList",
+      "tags": ["serials"],
+      "summary": "List koha.serial-objects",
+      "description": "",
+      "produces": [
+        "application/json"
+      ],
+      "parameters": [
+        {
+          "name": "biblionumber",
+          "in": "query",
+          "description": "Internal biblio identifier",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "name": "subscriptionid",
+          "in": "query",
+          "description": "Internal subscription identifier",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "List of serials",
+          "schema": {
+            "type": "array",
+            "items": {
+              "$ref": "../definitions.json#/serial"
+            }
+          }
+        },
+        "400": {
+          "description": "Bad parameters",
+          "schema": {
+            "$ref": "../definitions.json#/error"
+          }
+        },
+        "404": {
+          "description": "No related objects found",
+          "schema": {
+            "$ref": "../definitions.json#/error"
+          }
+        },
+        "500": {
+          "description": "Internal server error",
+          "schema": {
+            "$ref": "../definitions.json#/error"
+          }
+        }
+      }
+    },
+    "post": {
+      "x-mojo-to": "Serials#serial_post",
+      "operationId": "serialPost",
+      "tags": ["serials"],
+      "summary": "Creates a koha.serial-object",
+      "description": "",
+      "x-koha-authorization": {
+        "permissions": {
+          "serials": "serial_create"
+        }
+      },
+      "produces": [
+        "application/json"
+      ],
+      "parameters": [
+        {
+          "name": "serial",
+          "in": "body",
+          "description": "A JSON object of koha.serial-table columns and new values",
+          "required": true,
+          "schema": {
+            "$ref": "../definitions.json#/serial"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Create succeeded.",
+          "schema": {
+            "$ref": "../definitions.json#/serial"
+          }
+        },
+        "400": {
+          "description": "Bad parameters",
+          "schema": {
+            "$ref": "../definitions.json#/error"
+          }
+        },
+        "404": {
+          "description": "No related objects found",
+          "schema": {
+            "$ref": "../definitions.json#/error"
+          }
+        },
+        "500": {
+          "description": "Internal server error",
+          "schema": {
+            "$ref": "../definitions.json#/error"
+          }
+        }
+      }
+    }
+  },
+  "/serials/{serialid}": {
+    "get": {
+      "x-mojo-to": "Serials#serial_get",
+      "operationId": "serialGet",
+      "tags": ["serials"],
+      "summary": "Get a koha.serial-object",
+      "description": "",
+      "produces": [
+        "application/json"
+      ],
+      "parameters": [
+        {
+          "$ref": "../parameters.json#/serialidPathParam"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Get succeeded.",
+          "schema": {
+            "$ref": "../definitions.json#/serial"
+          }
+        },
+        "400": {
+          "description": "Bad parameters",
+          "schema": {
+            "$ref": "../definitions.json#/error"
+          }
+        },
+        "404": {
+          "description": "No related objects found",
+          "schema": {
+            "$ref": "../definitions.json#/error"
+          }
+        },
+        "500": {
+          "description": "Internal server error",
+          "schema": {
+            "$ref": "../definitions.json#/error"
+          }
+        }
+      }
+    },
+    "delete": {
+      "x-mojo-to": "Serials#serial_delete",
+      "operationId": "serialDelete",
+      "tags": ["serials"],
+      "summary": "Deletes a koha.serial-object",
+      "description": "",
+      "x-koha-authorization": {
+        "permissions": {
+          "serials": "serial_delete"
+        }
+      },
+      "produces": [
+        "application/json"
+      ],
+      "parameters": [
+        {
+          "$ref": "../parameters.json#/serialidPathParam"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Delete succeeded.",
+          "schema": {
+            "$ref": "../definitions.json#/serial"
+          }
+        },
+        "400": {
+          "description": "Bad parameters",
+          "schema": {
+            "$ref": "../definitions.json#/error"
+          }
+        },
+        "404": {
+          "description": "No related objects found",
+          "schema": {
+            "$ref": "../definitions.json#/error"
+          }
+        },
+        "500": {
+          "description": "Internal server error",
+          "schema": {
+            "$ref": "../definitions.json#/error"
+          }
+        }
+      }
+    },
+    "put": {
+      "x-mojo-to": "Serials#serial_put",
+      "operationId": "serialPut",
+      "tags": ["serials"],
+      "summary": "Updates a koha.serial-object",
+      "description": "",
+      "x-koha-authorization": {
+        "permissions": {
+          "serials": "serial_edit"
+        }
+      },
+      "produces": [
+        "application/json"
+      ],
+      "parameters": [
+        {
+          "$ref": "../parameters.json#/serialidPathParam"
+        },
+        {
+          "name": "serial",
+          "in": "body",
+          "description": "A JSON object of koha.serial-table columns and new values",
+          "required": true,
+          "schema": {
+            "$ref": "../definitions.json#/serial"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Create succeeded.",
+          "schema": {
+            "$ref": "../definitions.json#/serial"
+          }
+        },
+        "400": {
+          "description": "Bad parameters",
+          "schema": {
+            "$ref": "../definitions.json#/error"
+          }
+        },
+        "404": {
+          "description": "No related objects found",
+          "schema": {
+            "$ref": "../definitions.json#/error"
+          }
+        },
+        "500": {
+          "description": "Internal server error",
+          "schema": {
+            "$ref": "../definitions.json#/error"
+          }
+        }
+      }
+    }
+  },
   "/serials/collection": {
     "get": {
       "x-mojo-to": "Serials#get_collection",
