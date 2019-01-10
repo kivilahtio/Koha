@@ -40,6 +40,9 @@ use Koha::Subscription::Numberpatterns;
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS);
 
+use Koha::Logger;
+my $logger = bless({lazyLoad => {}}, 'Koha::Logger');
+
 # Define statuses
 use constant {
     EXPECTED               => 1,
@@ -352,6 +355,9 @@ sub GetCollectionMap {
         elsif (defined $x) {
             $collectionMap->{$colle->{serialseq_x}} = $colle;
         }
+        else {
+            $collectionMap->{$colle->{enumchron}} = $colle;
+        }
     }
 
     return $collectionMap;
@@ -361,13 +367,46 @@ sub _getCollection {
     my ($params) = @_;
     my $dbh = C4::Context->dbh;
 
-    my @params = ($params->{biblionumber});
-    my $sql = "SELECT sum(IF(status = 2, 1, 0)) as arrived, serialseq_x, serialseq_y, serialseq_z FROM serial s WHERE s.biblionumber = ?";
+    my @params;
+    # FULL OUTER JOIN MySQL-style
+    # If there are items with no serial information, count them as received as well.
+    my $sql = "\n".
+        "SELECT    SUM(IF(s1.status = 2 OR s1.status IS NULL, 1, 0)) as arrived,  \n".
+        "          i1.enumchron, serialseq_x, serialseq_y, serialseq_z  \n".
+        "FROM      items i1  \n".
+        "LEFT JOIN (  \n".
+        "            SELECT    serial.*, serialitems.itemnumber as sitemnumber  \n".
+        "            FROM      serial  \n".
+        "            LEFT JOIN serialitems ON serial.serialid = serialitems.serialid  \n".
+        "          ) AS s1 ON s1.sitemnumber = i1.itemnumber  \n".
+        "WHERE     i1.biblionumber = ?  \n";
+    push @params, $params->{biblionumber};
+
     if ($params->{serialStatus}) {
-        push @params, $params->{serialStatus};
-        $sql .= " AND s.status = ? ";
-    }
-    $sql .= " GROUP BY serialseq_x, serialseq_y, serialseq_z ";
+        $sql .= "  AND (s1.status = ? OR s1.status IS NULL)  \n"; push @params, $params->{serialStatus}; }
+
+    $sql .= "GROUP BY  enumchron, serialseq_x, serialseq_y, serialseq_z  \n".
+        "  \n".
+        "UNION  \n".
+        "  \n".
+        "SELECT    SUM(IF(s1.status = 2 OR s1.status IS NULL, 1, 0)) as arrived,  \n".
+        "          i1.enumchron, serialseq_x, serialseq_y, serialseq_z  \n".
+        "FROM      items i1  \n".
+        "RIGHT JOIN (  \n".
+        "            SELECT    serial.*, serialitems.itemnumber as sitemnumber  \n".
+        "            FROM      serial  \n".
+        "            LEFT JOIN serialitems ON serial.serialid = serialitems.serialid  \n".
+        "          ) AS s1 ON s1.sitemnumber = i1.itemnumber  \n".
+        "WHERE     s1.biblionumber = ?  \n";
+    push @params, $params->{biblionumber};
+
+    if ($params->{serialStatus}) {
+        $sql .= "  AND (s1.status = ? OR s1.status IS NULL) \n"; push @params, $params->{serialStatus}; }
+
+    $sql .= "GROUP BY  enumchron, serialseq_x, serialseq_y, serialseq_z  \n".
+        "; \n".
+        "";
+
     my $collection_sth = $dbh->prepare( $sql );
     $collection_sth->execute( @params );
     if ($collection_sth->errstr) {
@@ -375,6 +414,7 @@ sub _getCollection {
     }
 
     my $collection_ary = $collection_sth->fetchall_arrayref({});
+    $logger->debug("Got '".scalar(@$collection_ary)."' serial collections with biblionumber='".$params->{biblionumber}."', status='".$params->{serialStatus}."'") if $logger->is_debug();
     return $collection_ary;
 }
 
