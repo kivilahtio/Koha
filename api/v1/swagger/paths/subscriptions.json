@@ -1,0 +1,65 @@
+{
+  "/subscriptions": {
+    "get": {
+      "x-mojo-to": "Subscriptions#subscriptions_list",
+      "operationId": "subscriptionsList",
+      "tags": ["serials"],
+      "summary": "List subscriptions",
+      "description": "",
+      "produces": [
+        "application/json"
+      ],
+      "parameters": [
+        {
+          "name": "biblionumber",
+          "in": "query",
+          "description": "Internal biblio identifier",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "branchcode",
+          "in": "query",
+          "description": "Internal holding branch (library) identifier",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "List of koha.subscription-table rows",
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "400": {
+          "description": "Bad search parameters.",
+          "schema": {
+            "$ref": "../definitions.json#/error"
+          }
+        },
+        "404": {
+          "description": "No objects match the search request",
+          "schema": {
+            "$ref": "../definitions.json#/error"
+          }
+        },
+        "500": {
+          "description": "Internal server error",
+          "schema": {
+            "$ref": "../definitions.json#/error"
+          }
+        },
+        "503": {
+          "description": "Under maintenance",
+          "schema": {
+            "$ref": "../definitions.json#/error"
+          }
+        }
+      }
+    }
+  }
+}

@@ -209,6 +209,9 @@
   "/serials/collection": {
     "$ref": "paths/serials.json#/~1serials~1collection"
   },
+  "/subscriptions": {
+    "$ref": "paths/subscriptions.json#/~1subscriptions"
+  },
   "/suggestions": {
     "$ref": "paths/suggestions.json#/~1suggestions"
   },
