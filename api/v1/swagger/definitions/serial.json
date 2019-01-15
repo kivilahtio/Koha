@@ -1,5 +1,13 @@
 {
   "type": "object",
+  "required": [
+    "biblionumber",
+    "subscriptionid",
+    "serialseq",
+    "status",
+    "planneddate",
+    "publisheddate"
+  ],
   "properties": {
     "serialid": {
       "type": ["integer", "null"],
@@ -21,15 +29,15 @@
       "description": "enumeration or chronology of this serial"
     },
     "serialseq_x": {
-      "type": "string",
+      "type": ["string", "null"],
       "description": "1st component of this serial's enumeration"
     },
     "serialseq_y": {
-      "type": "string",
+      "type": ["string", "null"],
       "description": "2nd component of this serial's enumeration"
     },
     "serialseq_z": {
-      "type": "string",
+      "type": ["string", "null"],
       "description": "3rd component of this serial's enumeration"
     },
     "status": {

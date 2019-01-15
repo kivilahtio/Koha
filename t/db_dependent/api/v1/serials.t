@@ -24,7 +24,7 @@ BEGIN {
 
 use Modern::Perl;
 
-use Test::Most tests => 5;
+use Test::Most tests => 6;
 use Test::Mojo;
 use Data::Printer;
 use Storable qw(dclone);
@@ -194,7 +194,7 @@ subtest "Edit/PUT serials" => sub {
     subtest "Scenario: Bad serialid is not found from DB" => sub {
         plan tests => 3;
 
-        $t->put_ok('/api/v1/serials/99999999999' => {Accept => '*/*'} => json => {});
+        $t->put_ok('/api/v1/serials/99999999999' => {Accept => '*/*'} => json => dclone($serials[0]));
         p($t->tx->res->body) if ($ENV{VERBOSE});
         $t->status_is('404');
         $t->json_like('/error', qr/but no such serial exists/, 'Got correct error message');
@@ -235,6 +235,26 @@ subtest '/serials DELETE' => sub {
     $t->get_ok('/api/v1/serials?subscriptionid='.$subscription->{subscriptionid});
     p($t->tx->res->body) if ($ENV{VERBOSE});
     $t->status_is('404');
+};
+
+subtest 'Create a serial with missing mandatory attributes', sub {
+    plan tests => 2;
+
+    my $payload = {
+        biblionumber => $items[0]->{biblionumber},
+        subscriptionid => $subscription->{subscriptionid},
+        serialseq => '2018 : 12 : 52',
+        serialseq_x => 2018,
+        serialseq_y => 12,
+        serialseq_z => 52,
+        planneddate => undef,
+        publisheddate => undef,
+        status => 2
+    };
+
+    $t->post_ok('/api/v1/serials/' => {Accept => '*/*'} => json => $payload);
+    p($t->tx->res->body) if ($ENV{VERBOSE});
+    $t->status_is('400');
 };
 
 sub authenticateToRESTAPI {
