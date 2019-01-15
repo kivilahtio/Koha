@@ -64,7 +64,7 @@ Items.ItemsTableRowTmpl = {
             Items.getAvailability(item),
             (item.datelastseen ? item.datelastseen : ''),
             (item.barcode ? '<a href="/cgi-bin/koha/catalogue/moredetail.pl?type=&amp;itemnumber='+item.itemnumber+'&amp;biblionumber='+item.biblionumber+'&amp;bi='+item.biblioitemnumber+'#item'+item.itemnumber+'">'+item.barcode+'</a>' : ""),
-            (item.enumchron ? item.enumchron+' <span class="pubdate">('+item.publisheddate+')</span>' : ""),
+            (item.enumchron ? '<a class="pubdate" onclick="serialEditor.loadSerial('+(item.serialid || 0)+', '+(item.itemnumber || 0)+')" >'+item.enumchron+'('+item.publisheddate+')</a>' : ""),
             (item.uri ? item.uri : ''),
             (item.copynumber ? item.copynumber : ''),
             (item.materials ? item.materials : ''),

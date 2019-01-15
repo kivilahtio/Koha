@@ -3,6 +3,147 @@ if (typeof Items == "undefined") {
     this.Items = {}; //Set the global package
 }
 
+Items.itemGet = function (itemnumber) {
+    if (!itemnumber) {
+        throw new TypeError("Items.itemGet():> No itemnumber!");
+    }
+
+    return new Promise((resolve, reject) => {
+        $.ajax("/api/v1/items/"+itemnumber, {
+            "method": "GET",
+            "accepts": "application/json",
+            "contentType": "application/json; charset=utf8",
+            "success": function (jqXHR, textStatus, errorThrown) {
+                var item = jqXHR;
+
+                if (item.itemnumber) {
+                    log.debug(`Items.itemGet(${itemnumber}) :> Got Item `, item);
+                    resolve(item);
+                }
+                else {
+                    reject({
+                        error: "Missing itemnumber?",
+                        item
+                    });
+                }
+            },
+            "error": function (jqXHR, textStatus, errorThrown) {
+                log.error(`Items.itemGet(${itemnumber}) :> Error `, jqXHR.responseText);
+                var responseObject = JSON.parse(jqXHR.responseText);
+                reject(responseObject);
+            },
+        });
+    });
+};
+
+/**
+ * koha.items-row
+ *
+ * @param {Object} with koha.items-rows columns as attributes
+ */
+Items.Item = class Item {
+    constructor(item) {
+        this.itemnumber = item.itemnumber;
+        this.biblionumber = item.biblionumber;
+        this.biblioitemnumber = item.biblioitemnumber;
+        this.barcode = item.barcode;
+        this.dateaccessioned = item.dateaccessioned;
+        this.datereceived = item.datereceived;
+        this.booksellerid = item.booksellerid;
+        this.homebranch = item.homebranch;
+        this.price = item.price;
+        this.replacementprice = item.replacementprice;
+        this.replacementpricedate = item.replacementpricedate;
+        this.datelastborrowed = item.datelastborrowed;
+        this.datelastseen = item.datelastseen;
+        this.stack = item.stack;
+        this.notforloan = item.notforloan;
+        this.damaged = item.damaged;
+        this.itemlost = item.itemlost;
+        this.itemlost_on = item.itemlost_on;
+        this.withdrawn = item.withdrawn;
+        this.withdrawn_on = item.withdrawn_on;
+        this.itemcallnumber = item.itemcallnumber;
+        this.coded_location_qualifier = item.coded_location_qualifier;
+        this.issues = item.issues;
+        this.renewals = item.renewals;
+        this.reserves = item.reserves;
+        this.restricted = item.restricted;
+        this.itemnotes = item.itemnotes;
+        this.itemnotes_nonpublic = item.itemnotes_nonpublic;
+        this.holdingbranch = item.holdingbranch;
+        this.paidfor = item.paidfor;
+        this.timestamp = item.timestamp;
+        this.location = item.location;
+        this.permanent_location = item.permanent_location;
+        this.onloan = item.onloan;
+        this.cn_source = item.cn_source;
+        this.cn_sort = item.cn_sort;
+        this.ccode = item.ccode;
+        this.materials = item.materials;
+        this.uri = item.uri;
+        this.itype = item.itype;
+        this.more_subfields_xml = item.more_subfields_xml;
+        this.enumchron = item.enumchron;
+        this.copynumber = item.copynumber;
+        this.stocknumber = item.stocknumber;
+        this.new_status = item.new_status;
+        this.genre = item.genre;
+        this.sub_location = item.sub_location;
+        this.circulation_level = item.circulation_level;
+        this.reserve_level = item.reserve_level;
+        this.holding_id = item.holding_id;
+
+        this._status = item._status || Items.Item.Status.New;
+
+        log.trace(`Items.Item.new():> `, this);
+    }
+
+    /**
+     * Reload this object from the REST API
+     *
+     * @returns {Promise}
+     */
+    reload() {
+        this._status = Items.Item.Status.Reloading;
+        return new Promise((resolve, reject) => {
+            Items.itemGet(this.itemnumber)
+            .then((item) => {
+                log.debug(`Items.Item.reload(${this.itemnumber}) :> Got item `, item);
+                for (let key in item) {
+                    this[key] = item[key];
+                }
+                this._status = Items.Item.Status.Complete;
+                resolve(item);
+            })
+            .catch((error) => {
+                log.error(`Items.Item.reload(${this.itemnumber}) :> Reloading a item failed: `, error);
+                this._status = error;
+                reject(error);
+            });
+        });
+    }
+};
+Items.Item.cast = function (item) {
+    if (typeof item === 'number') {
+        return new Items.Item({itemnumber: item, _status: Items.Item.Status.Slim});
+    }
+    else if (typeof item === 'object') {
+        return new Items.Item(item);
+    }
+    else if (typeof item === 'Item') {
+        return item;
+    }
+    else {
+        throw new TypeError(`Cannot cast '${item}' to Item.`);
+    }
+};
+Items.Item.Status = {};
+Items.Item.Status.Slim      = 'Slim';
+Items.Item.Status.New       = 'New';
+Items.Item.Status.Reloading = 'Reloading';
+Items.Item.Status.Complete  = 'Complete';
+
 /**
  * Resolves the availability of the given Item and returns a nice html-representation of the Item's availability statuses.
  */
