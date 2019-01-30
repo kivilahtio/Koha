@@ -29,6 +29,7 @@ Items.ItemsTableView.template = function () {
     '        <th>'+MSG_HOST_RECORDS+'</th>'+
     '        <th class="NoSort"></th>'+
     '        <th class="NoSort"></th>'+
+    '        <th class="NoSort"></th>'+
     '    </tr>'+
     '</thead>'+
     '<tbody>'+
@@ -64,7 +65,7 @@ Items.ItemsTableRowTmpl = {
             Items.getAvailability(item),
             (item.datelastseen ? item.datelastseen : ''),
             (item.barcode ? '<a href="/cgi-bin/koha/catalogue/moredetail.pl?type=&amp;itemnumber='+item.itemnumber+'&amp;biblionumber='+item.biblionumber+'&amp;bi='+item.biblioitemnumber+'#item'+item.itemnumber+'">'+item.barcode+'</a>' : ""),
-            (item.enumchron ? '<a class="pubdate" onclick="serialEditor.loadSerial('+(item.serialid || 0)+', '+(item.itemnumber || 0)+')" >'+item.enumchron+'('+item.publisheddate+')</a>' : ""),
+            (item.enumchron ? item.enumchron+' <span class="pubdate">('+item.publisheddate+')</span>' : ""),
             (item.uri ? item.uri : ''),
             (item.copynumber ? item.copynumber : ''),
             (item.materials ? item.materials : ''),
@@ -72,7 +73,8 @@ Items.ItemsTableRowTmpl = {
             '<a href="/cgi-bin/koha/labels/spinelabel-print.pl?barcode='+item.barcode+'" >'+MSG_PRINT_LABEL+'</a>',
             ( item.hostbiblionumber ? '<a href="/cgi-bin/koha/catalogue/detail.pl?biblionumber='+item.hostbiblionumber+'" >'+item.hosttitle+'</a>' : ''),
             '<a class="btn btn-default btn-xs" href="/cgi-bin/koha/cataloguing/additem.pl?op=edititem&amp;biblionumber='+item.biblionumber+'&amp;itemnumber='+item.itemnumber+'#edititem"><i class="fa fa-pencil"></i> '+MSG_EDIT+'</a><br/>',
-            '<a class="btn btn-default btn-xs placeHold" onclick="holdPicker.selectItem('+item.itemnumber+')"><i class="fa fa-sticky-note-o"></i> '+MSG_HOLD+'</a>'
+            '<a class="btn btn-default btn-xs placeHold" onclick="holdPicker.selectItem('+item.itemnumber+')"><i class="fa fa-sticky-note-o"></i> '+MSG_HOLD+'</a>',
+            '<a class="btn btn-default btn-xs" onclick="serialEditor.loadSerial('+(item.serialid || 0)+', '+(item.itemnumber || 0)+')" ><i class="fa fa-pencil"></i>'+MSG_EDIT_SERIAL+'</a>'
         ];
     },
     getSelector: function (item) {

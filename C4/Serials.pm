@@ -157,10 +157,32 @@ sub AddSerial {
     $serial->{serialid} = $sth->{mysql_insertid} // $sth->last_insert_id() // Koha::Exception::DB->throw(error => "Couldn't get the last_insert_id from a newly created serial $serial");
 
     if ($serial->{itemnumber}) {
-        $sth = $dbh->prepare("INSERT INTO serialitems (itemnumber, serialid) VALUES (?, ?)") || Koha::Exception::DB->throw(error => "Preparing statement for serial '".$serial->{serialid}."' failed: ".$dbh->errstr);
-        $sth->execute($serial->{itemnumber}, $serial->{serialid}) || Koha::Exception::DB->throw(error => "Adding item-link for serial '".$serial->{serialid}."' failed: ".$dbh->errstr);
+        DeleteSerialItemLinks($serial->{serialid});
+        DeleteSerialItemLinks(undef, $serial->{itemnumber});
+        AddSerialItemLink($serial->{serialid}, $serial->{itemnumber});
     }
     return $serial;
+}
+
+=head2 AddSerialItemLink
+
+ @param {Integer} serialid
+ @param {Integer} itemnumber
+ @returns {Integer} Number of rows inserted
+ @throws Koha::Exception::DB
+
+=cut
+
+sub AddSerialItemLink {
+    my ($serialid, $itemnumber) = @_;
+    Koha::Exception::BadParameter->throw(error => "Missing mandatory parameter 'serialid'") unless $serialid;
+    Koha::Exception::BadParameter->throw(error => "Missing mandatory parameter 'itemnumber'") unless $itemnumber;
+    $logger->debug("Adding serialitem link: serialid='".($serialid || 'undef')."' itemnumber='".($itemnumber || 'undef')) if $logger->is_debug();
+
+    my $dbh = C4::Context->dbh();
+    my $sth = $dbh->prepare("INSERT INTO serialitems (itemnumber, serialid) VALUES (?, ?)")
+        || Koha::Exception::DB->throw(error => "Preparing statement for serial serialid='".($serialid || 'undef')."' itemnumber='".($itemnumber || 'undef')."' failed: ".$dbh->errstr);
+    return $sth->execute($itemnumber, $serialid) || Koha::Exception::DB->throw(error => "Adding item-link for serialid='".($serialid || 'undef')."' itemnumber='".($itemnumber || 'undef')."' failed: ".$dbh->errstr);
 }
 
 =head2 DeleteSerial
@@ -183,6 +205,41 @@ sub DeleteSerial {
     return $deletedCount;
 }
 
+=head2 DeleteSerialItemLinks
+
+Deletes koha.serialitems-rows matching the given serialid and/or itemnumber
+
+ @param {Integer} serialid
+ @param {Integer} itemnumber
+ @returns {Integer} Number of rows deleted
+ @throws Koha::Exception::DB
+
+=cut
+
+sub DeleteSerialItemLinks {
+    my ($serialid, $itemnumber) = @_;
+    $logger->debug("Deleting serialitem links '".($serialid || 'undef')."' '".($itemnumber || 'undef')."'") if $logger->is_debug();
+
+    my @params;
+    my $sql = "DELETE FROM serialitems WHERE 1 \n";
+
+    if ($serialid) {
+        push(@params, $serialid);
+        $sql .= "  AND serialid = ? \n";
+    }
+    if ($itemnumber) {
+        push(@params, $itemnumber);
+        $sql .= "  AND itemnumber = ? \n";
+    }
+    Koha::Exception::BadParameter->throw(error => __PACKAGE__."::DeleteSerialItemLinks(".($serialid || 'undef').", ".($itemnumber || 'undef')."):> Atleast one parameter must be given to prevent cleaning the whole serialitems-table!") if (@params == 0);
+
+    my $dbh = C4::Context->dbh();
+    my $sth = $dbh->prepare($sql) || Koha::Exception::DB->throw(error => $dbh->errstr);
+    my $deletedCount = $sth->execute(@params);
+    Koha::Exception::DB->throw(error => $dbh->errstr) if $dbh->errstr();
+    return $deletedCount;
+}
+
 =head2 GetSerial
 
  @param {Integer} serialid
@@ -198,6 +255,39 @@ sub GetSerial {
     my $serial = $dbh->selectrow_hashref("SELECT serial.*, serialitems.itemnumber FROM serial LEFT JOIN serialitems ON serial.serialid = serialitems.serialid WHERE serial.serialid = ?", {}, $serialid);
     Koha::Exception::DB->throw(error => $dbh->errstr) if $dbh->errstr();
     return $serial;
+}
+
+=head2 GetSerialItemLinks
+
+ @param {Integer} serialid
+ @param {Integer} itemnumber
+ @returns {ARRAYRef of HASHRef} koha.serialitems-rows filtered with the given serialid and/or itemnumber
+ @throws Koha::Exception::DB
+
+=cut
+
+sub GetSerialItemLinks {
+    my ($serialid, $itemnumber) = @_;
+    $logger->debug("Getting serialitem links '".($serialid || 'undef')."' '".($itemnumber || 'undef')."'") if $logger->is_debug();
+
+    my @params;
+    my $sql =
+        "SELECT * FROM serialitems \n".
+        ($serialid || $itemnumber ? "WHERE 1 \n" : '');
+
+    if ($serialid) {
+        push(@params, $serialid);
+        $sql .= "  AND serialid = ? \n";
+    }
+    if ($itemnumber) {
+        push(@params, $itemnumber);
+        $sql .= "  AND itemnumber = ? \n";
+    }
+
+    my $dbh = C4::Context->dbh();
+    my $sis = $dbh->selectall_arrayref($sql, { Slice => {} }, @params);
+    Koha::Exception::DB->throw(error => $dbh->errstr) if $dbh->errstr();
+    return $sis;
 }
 
 =head2 ListSerials
@@ -261,6 +351,13 @@ sub ModSerial {
         $serial->{serialid}
     ) || Koha::Exception::DB->throw(error => $dbh->errstr);
     Koha::Exception::UnknownObject->throw(error => "Trying to update serial '".($serial->{serialid} || 'undef')."' but no such serial exists.") unless $rowsAffected > 0;
+
+    if ($serial->{itemnumber}) {
+        DeleteSerialItemLinks($serial->{serialid});
+        DeleteSerialItemLinks(undef, $serial->{itemnumber});
+        AddSerialItemLink($serial->{serialid}, $serial->{itemnumber});
+    }
+
     return $serial;
 }
 

@@ -91,7 +91,6 @@ use MARC::Field;
 use MARC::Record;
 use Modern::Perl;
 use Pod::Usage;
-
 my $verbose = 0;
 my $commit = 5000;
 my ($delete, $help, $man);

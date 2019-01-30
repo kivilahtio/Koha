@@ -21,7 +21,7 @@ Serials.serialGet = function (serialid) {
                 var serial = jqXHR;
 
                 if (serial.serialid) {
-                    if (log.isDebugEnabled()) log.debug(`Serials.serialGet(${serialid}) :> Got serial '${Serials.stringifyError(serial)}'`);
+                    console.log(`Serials.serialGet(${serialid}) :> Got serial `, serial);
                     resolve(serial);
                 }
                 else {
@@ -32,7 +32,7 @@ Serials.serialGet = function (serialid) {
                 }
             },
             "error": function (jqXHR, textStatus, errorThrown) {
-                log.error(`Serials.serialGet(${serialid}) :> Error `, jqXHR.responseText);
+                console.error(`Serials.serialGet(${serialid}) :> Error `, jqXHR);
                 var responseObject = JSON.parse(jqXHR.responseText);
                 reject(responseObject);
             },
@@ -54,7 +54,7 @@ Serials.serialDelete = function (serialid) {
                 var serial = jqXHR;
 
                 if (serial.serialid) {
-                    if (log.isDebugEnabled()) log.debug(`Serials.serialDelete(${serialid}) :> Deleted serial '${Serials.stringifyError(serial)}'`);
+                    console.log(`Serials.serialDelete(${serialid}) :> Deleted serial `, serial);
                     resolve(serial);
                 }
                 else {
@@ -65,7 +65,7 @@ Serials.serialDelete = function (serialid) {
                 }
             },
             "error": function (jqXHR, textStatus, errorThrown) {
-                log.error(`Serials.serialDelete(${serialid}) :> Error `, jqXHR.responseText);
+                console.error(`Serials.serialDelete(${serialid}) :> Error `, jqXHR);
                 var responseObject = JSON.parse(jqXHR.responseText);
                 reject(responseObject);
             },
@@ -85,7 +85,7 @@ Serials.serialPost = function (serial) {
                 var serial = jqXHR;
 
                 if (serial.serialid) {
-                    if (log.isDebugEnabled()) log.debug(`Serials.serialPost(${serial.serialid}) :> Got serial '${Serials.stringifyError(serial)}'`);
+                    console.log(`Serials.serialPost(${serial.serialid}) :> Got serial `, serial);
                     resolve(serial);
                 }
                 else {
@@ -96,7 +96,7 @@ Serials.serialPost = function (serial) {
                 }
             },
             "error": function (jqXHR, textStatus, errorThrown) {
-                log.error(`Serials.serialPost(${serial.serialid}) :> Error `, jqXHR.responseText);
+                console.error(`Serials.serialPost() :> Error `, jqXHR);
                 var responseObject = JSON.parse(jqXHR.responseText);
                 reject(responseObject);
             },
@@ -105,6 +105,8 @@ Serials.serialPost = function (serial) {
 };
 
 Serials.serialPut = function (serial) {
+    if (!serial.serialid) throw new Error("serial.serialid is missing?");
+
     return new Promise((resolve, reject) => {
         $.ajax("/api/v1/serials/"+serial.serialid, {
             "method": "PUT",
@@ -116,7 +118,7 @@ Serials.serialPut = function (serial) {
                 var serial = jqXHR;
 
                 if (serial.serialid) {
-                    if (log.isDebugEnabled()) log.debug(`Serials.serialPut(${serial.serialid}) :> Got serial '${Serials.stringifyError(serial)}'`);
+                    console.log(`Serials.serialPut(${serial.serialid}) :> Got serial `, serial);
                     resolve(serial);
                 }
                 else {
@@ -127,7 +129,7 @@ Serials.serialPut = function (serial) {
                 }
             },
             "error": function (jqXHR, textStatus, errorThrown) {
-                log.error(`Serials.serialPut(${serial.serialid}) :> Error `, jqXHR.responseText);
+                console.error(`Serials.serialPut(${serial.serialid}) :> Error `, jqXHR);
                 var responseObject = JSON.parse(jqXHR.responseText);
                 reject(responseObject);
             },
@@ -162,7 +164,7 @@ Serials.Serial = class Serial {
 
         this._status = serial._status || Serials.Serial.Status.New;
 
-        if (log.isTraceEnabled()) log.trace(`Serials.Serial.new():> '${Serials.stringifyError(this)}'`);
+        console.log(`Serials.Serial.new():> `, this);
     }
 
     /**
@@ -175,7 +177,7 @@ Serials.Serial = class Serial {
         return new Promise((resolve, reject) => {
             Serials.serialGet(this.serialid)
             .then((serial) => {
-                log.debug(`Serials.Serial.reload(${this.serialid}) :> Got serial `, serial);
+                console.log(`Serials.Serial.reload(${this.serialid}) :> Got serial `, serial);
                 for (let key in serial) {
                     this[key] = serial[key];
                 }
@@ -183,7 +185,7 @@ Serials.Serial = class Serial {
                 resolve(serial);
             })
             .catch((error) => {
-                log.error(`Serials.Serial.reload(${this.serialid}) :> Reloading a serial failed: `, error);
+                console.error(`Serials.Serial.reload(${this.serialid}) :> Reloading a serial failed: `, error);
                 this._status = error;
                 reject(error);
             });
@@ -223,7 +225,7 @@ Serials.SerialEditor = class SerialEditor {
         this.translations = params.translations || {};
         this.rootElement;
 
-        log.trace(`Serials.SerialEditor.new():> `, Serials.stringifyError(this));
+        console.log(`Serials.SerialEditor.new():> `, this);
     }
 
     /**
@@ -233,9 +235,10 @@ Serials.SerialEditor = class SerialEditor {
      *            {Serial or Integer} 'serial' - The Serial-object being edited. If only the serialid (int) is passed, fetches a matching serial-object via the REST API.
      */
     loadSerial(serialOrId, itemnumber) {
-        log.debug("Serials.SerialEditor.loadSerial("+serialOrId+", "+itemnumber+") :> Loading serial");
+        console.log("Serials.SerialEditor.loadSerial("+serialOrId+", "+itemnumber+") :> Loading serial");
 
         if (! this.rootElement) this.render();
+        this.clearNotifications();
 
         if (serialOrId) {
             this.serial = Serials.Serial.cast(serialOrId);
@@ -251,19 +254,18 @@ Serials.SerialEditor = class SerialEditor {
                 }
             })
             .then((serial) => {
-                log.debug(`Serials.SerialEditor.loadSerial(${serial}) :> Got the complete serial`);
+                console.log(`Serials.SerialEditor.loadSerial(${serial}) :> Got the complete serial`);
                 this._syncFormValues('toForm');
-                this.clearNotifications();
                 this.show();
             })
             .catch((error) => {
-                log.error(`Serials.SerialEditor.loadSerial(${serialOrId}) :> Reloading a serial failed: `, error);
+                console.error(`Serials.SerialEditor.loadSerial(${serialOrId}) :> Reloading a serial failed: `, error);
                 this.pushNotification("Failed to load the serial");
             });
         }
         else if (itemnumber) {
             this.pushNotification("<h4>Creating a new serial</h4>");
-            log.debug(`Serials.SerialEditor.loadSerial(${serialOrId}, ${itemnumber}) :> Missing Serial, creating a new Serial.`);
+            console.log(`Serials.SerialEditor.loadSerial(${serialOrId}, ${itemnumber}) :> Missing Serial, creating a new Serial.`);
 
             let item = Items.Item.cast(itemnumber);
 
@@ -278,7 +280,7 @@ Serials.SerialEditor = class SerialEditor {
                 }
             })
             .then((item) => {
-                log.debug(`Serials.SerialEditor.loadSerial(${serialOrId}, ${itemnumber}) :> Got the complete Item`);
+                console.log(`Serials.SerialEditor.loadSerial(${serialOrId}, ${itemnumber}) :> Got the complete Item`);
 
                 let serialseq_xyz;
                 if (item.enumchron) serialseq_xyz = item.enumchron.match(/\d+/g).map(Number);
@@ -294,11 +296,10 @@ Serials.SerialEditor = class SerialEditor {
                     publisheddate:new Date().toISOString().substr(0,10),
                 });
                 this._syncFormValues('toForm');
-                this.clearNotifications();
                 this.show();
             })
             .catch((error) => {
-                log.error(`Serials.SerialEditor.loadSerial(${serialOrId}, ${itemnumber}) :> Reloading an Item failed: `, error);
+                console.error(`Serials.SerialEditor.loadSerial(${serialOrId}, ${itemnumber}) :> Reloading an Item failed: `, error);
                 this.pushNotification("Failed to load the Item");
             });
         }
@@ -308,7 +309,7 @@ Serials.SerialEditor = class SerialEditor {
     }
 
     checkRequirements() {
-        if (log.isDebugEnabled()) log.debug(`Serials.SerialEditor.checkRequirements(${this}) :>`);
+        console.log(`Serials.SerialEditor.checkRequirements(${this}) :>`);
         if(typeof jQuery === 'undefined') {
             throw new Error("jQuery https://jquery.com/ is not available");
         }
@@ -330,14 +331,14 @@ Serials.SerialEditor = class SerialEditor {
     }
 
     render() {
-        if (log.isDebugEnabled()) log.debug(`Serials.SerialEditor.render(${this}) :>`);
+        console.log(`Serials.SerialEditor.render(${this}) :>`);
         this.rootElement = this._template();
         this._bindEvents(this.rootElement);
         this.rootElement.appendTo('body').draggable();
     }
 
     _template() {
-        if (log.isDebugEnabled()) log.debug(`Serials.SerialEditor._template(${this}) :>`);
+        console.log(`Serials.SerialEditor._template(${this}) :>`);
         var html =
         `
         <fieldset id="SerialEditor" style="position: absolute; width: 400px; right: 75px;">
@@ -418,7 +419,7 @@ Serials.SerialEditor = class SerialEditor {
     }
 
     _bindEvents() {
-        if (log.isDebugEnabled()) log.debug(`Serials.SerialEditor._bindEvents(${this}) :>`);
+        console.log(`Serials.SerialEditor._bindEvents(${this}) :>`);
         this._getCloseButton().bind({
             "click": (event) => {
                 this.rootElement.hide();
@@ -459,18 +460,18 @@ Serials.SerialEditor = class SerialEditor {
      * @param {Boolean} toForm Sync values from the loaded Serial to the GUI form inputs? If false, syncs from the GUI form to the loaded Serial.
      */
     _syncFormValues(toForm) {
-        if (log.isDebugEnabled()) log.debug(`Serials.SerialEditor._syncFormValues(${toForm}) :>`);
+        console.log(`Serials.SerialEditor._syncFormValues(${toForm}) :>`);
         for (let key in this.serial) {
             if (key.substr(0,1) === '_') continue;
 
             let input = this.rootElement.find(`input#sedit_new_${key}`);
             if (! input) {
-                log.error(`Couldn't find form input field for attribute '${key}'`);
+                console.error(`Couldn't find form input field for attribute '${key}'`);
             }
             else {
                 if (toForm) {
                     input.val( (this.serial[key] ? filterXSS(this.serial[key]) : undefined) );
-                    if (key === 'serialid' || key === 'biblionumber' || key === 'itemnumber') {
+                    if (key === 'serialid' || key === 'biblionumber') {
                         input.prop('disabled', true);
                     }
                 }
@@ -493,18 +494,18 @@ Serials.SerialEditor = class SerialEditor {
     }
 
     hide() {
-        if (log.isDebugEnabled()) log.debug(`Serials.SerialEditor.hide(${this}) :>`);
+        console.log(`Serials.SerialEditor.hide(${this}) :>`);
         this.rootElement.hide();
     }
     show() {
-        if (log.isDebugEnabled()) log.debug(`Serials.SerialEditor.show(${this}) :>`);
+        console.log(`Serials.SerialEditor.show(${this}) :>`);
         this.rootElement.show();
     }
     clearNotifications() {
         this._getNotificationsField().html('');
     }
     pushNotification(msg, level) {
-        if (log.isDebugEnabled()) log.debug(`Serials.SerialEditor.pushNotification(${msg}) :>`);
+        console.log(`Serials.SerialEditor.pushNotification(${msg}) :>`);
         this._getNotificationsField().prepend(`<div>${msg}</div>`);
     }
 

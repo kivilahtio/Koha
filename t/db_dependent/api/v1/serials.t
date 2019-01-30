@@ -173,7 +173,7 @@ subtest "List/GET serials when there is something to list/GET" => sub {
 };
 
 subtest "Edit/PUT serials" => sub {
-    plan tests => 7;
+    plan tests => 8;
 
     $t->put_ok('/api/v1/serials/'.$serials[0]->{serialid} => {Accept => '*/*'} => json => dclone($serials[0]));
     p($t->tx->res->body) if ($ENV{VERBOSE});
@@ -199,6 +199,36 @@ subtest "Edit/PUT serials" => sub {
         $t->status_is('404');
         $t->json_like('/error', qr/but no such serial exists/, 'Got correct error message');
     };
+
+    subtest("Scenario: serialitems-link autovivificated", sub {
+        plan tests => 7;
+
+        my $s = C4::Serials::GetSerial($serials[0]->{serialid});
+        is($s->{itemnumber}, $items[0]->{itemnumber},
+            "Given Serial 0 is linked to Item 0");
+
+        $s = C4::Serials::GetSerial($serials[1]->{serialid});
+        is($s->{itemnumber}, $items[1]->{itemnumber},
+            "And Serial 1 is linked to Item 1");
+
+        # Move item under another serial
+        ok($serials[0]->{itemnumber} = $items[1]->{itemnumber},
+            "When Serial 0 is linked to Item 1");
+
+        $t->put_ok('/api/v1/serials/'.$serials[0]->{serialid} => {Accept => '*/*'} => json => dclone($serials[0]));
+
+        $s = C4::Serials::GetSerial($serials[0]->{serialid});
+        is($s->{itemnumber}, $items[1]->{itemnumber},
+            "Then Serial 0 is linked to Item 1");
+
+        $s = C4::Serials::GetSerial($serials[1]->{serialid});
+        is($s->{itemnumber}, undef,
+            "And Serial 1 lost it's link to Item 1");
+
+        $s = C4::Serials::GetSerialItemLinks($serials[0]->{serialid}, $items[0]->{itemnumber});
+        is(@$s, 0,
+            "And Serial 0 lost it's link to Item 0");
+    });
 
 };
 

@@ -1331,6 +1331,7 @@ function verify_images() {
     var MSG_CURRENT_LOCATION = _("Current location");
     var MSG_DUE_DATE = _("due");
     var MSG_EDIT = _("Edit");
+    var MSG_EDIT_SERIAL = _("Edit serial");
     var MSG_HOLD_FOR = _("Hold for");
     var MSG_HOLD = _("Hold");
     var MSG_HOLD_PLACED = _("Hold placed");

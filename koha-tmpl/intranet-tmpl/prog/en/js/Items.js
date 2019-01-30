@@ -17,7 +17,7 @@ Items.itemGet = function (itemnumber) {
                 var item = jqXHR;
 
                 if (item.itemnumber) {
-                    log.debug(`Items.itemGet(${itemnumber}) :> Got Item `, item);
+                    console.log(`Items.itemGet(${itemnumber}) :> Got Item `, item);
                     resolve(item);
                 }
                 else {
@@ -28,7 +28,7 @@ Items.itemGet = function (itemnumber) {
                 }
             },
             "error": function (jqXHR, textStatus, errorThrown) {
-                log.error(`Items.itemGet(${itemnumber}) :> Error `, jqXHR.responseText);
+                console.error(`Items.itemGet(${itemnumber}) :> Error `, jqXHR);
                 var responseObject = JSON.parse(jqXHR.responseText);
                 reject(responseObject);
             },
@@ -109,7 +109,7 @@ Items.Item = class Item {
         return new Promise((resolve, reject) => {
             Items.itemGet(this.itemnumber)
             .then((item) => {
-                log.debug(`Items.Item.reload(${this.itemnumber}) :> Got item `, item);
+                console.log(`Items.Item.reload(${this.itemnumber}) :> Got item `, item);
                 for (let key in item) {
                     this[key] = item[key];
                 }
@@ -117,7 +117,7 @@ Items.Item = class Item {
                 resolve(item);
             })
             .catch((error) => {
-                log.error(`Items.Item.reload(${this.itemnumber}) :> Reloading a item failed: `, error);
+                console.error(`Items.Item.reload(${this.itemnumber}) :> Reloading a item failed: `, error);
                 this._status = error;
                 reject(error);
             });

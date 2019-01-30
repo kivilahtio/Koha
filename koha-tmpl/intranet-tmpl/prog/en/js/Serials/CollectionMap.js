@@ -130,7 +130,7 @@ Serials.CollectionMap = {
             if (data.node.children.length > 0) {
                 //This is not a leaf node.
                 var node_id = data.node.id;
-                var serialseqs_xyz = node_id.split(":");
+                var serialseqs_xyz = node_id.split(":").map((e) => e.trim());
                 Serials.CollectionMap.displaySerialItems(self, {
                     serialseq_x: serialseqs_xyz[0],
                     serialseq_y: serialseqs_xyz[1],
@@ -139,14 +139,25 @@ Serials.CollectionMap = {
                 });
                 return;
             }
-            var node_id = data.node.id;
-            var serialseqs_xyz = node_id.split(":");
-            Serials.CollectionMap.displaySerialItems(self, {serialseq_x: serialseqs_xyz[0],
-                                                            serialseq_y: serialseqs_xyz[1],
-                                                            serialseq_z: serialseqs_xyz[2],
-                                                            biblionumber: self.biblionumber,
-                                                        }
-                                                    );
+            else if (data.node.parents[0] === '#') {
+                // This is a level 1 node, parent is the root of the whole tree
+                // It has only the x-level of serial enumeration
+                var node_id = data.node.id;
+                Serials.CollectionMap.displaySerialItems(self, {serialseq_x: node_id,
+                                                                biblionumber: self.biblionumber,
+                                                            }
+                                                        );
+            }
+            else {
+                var node_id = data.node.id;
+                var serialseqs_xyz = node_id.split(":").map((e) => e.trim());
+                Serials.CollectionMap.displaySerialItems(self, {serialseq_x: serialseqs_xyz[0],
+                                                                serialseq_y: serialseqs_xyz[1],
+                                                                serialseq_z: serialseqs_xyz[2],
+                                                                biblionumber: self.biblionumber,
+                                                            }
+                                                        );
+            }
         });
     },
 
@@ -180,9 +191,9 @@ Serials.CollectionMap = {
                 "accepts": "application/json",
                 "data": {
                     biblionumber: params.biblionumber,
-                    serialseq_x: params.serialseq_x,
-                    serialseq_y: params.serialseq_y,
-                    serialseq_z: params.serialseq_z,
+                    serialseq_x: (params.serialseq_x && params.serialseq_x === 'null' ? '' : params.serialseq_x),
+                    serialseq_y: (params.serialseq_y && params.serialseq_y === 'null' ? '' : params.serialseq_y),
+                    serialseq_z: (params.serialseq_z && params.serialseq_z === 'null' ? '' : params.serialseq_z),
                     serialStatus: 2, //Receive only arrived serials
                 },
                 "success": function (jqXHR, textStatus, errorThrown) {
@@ -205,6 +216,7 @@ Serials.CollectionMap = {
         var jstreeNodes = [];
 
         function recurseNode(collectionsMap, depth, parentKey, parentNode, nodeKey, node) {
+            if (!nodeKey) nodeKey = 'null';
             node.id     = (parentNode) ? parentNode.id   + ":" + nodeKey : nodeKey;
             node.text   = (parentNode) ? parentNode.text + ":" + nodeKey : nodeKey;
             node.parent = (parentNode) ? parentNode.id : "#";
